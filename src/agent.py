@@ -1,14 +1,19 @@
 from a2a.server.tasks import TaskUpdater
 from a2a.types import Message, TaskState, Part, TextPart
 from a2a.utils import get_message_text, new_agent_text_message
+from google import genai
+import os
+from dotenv import load_dotenv
 
 from messenger import Messenger
 
+load_dotenv()
 
 class Agent:
     def __init__(self):
         self.messenger = Messenger()
-        # Initialize other state here
+        self.client = genai.Client(api_key=os.environ.get("GOOGLE_API_KEY"))
+        self.model = "gemini-2.5-flash"
 
     async def run(self, message: Message, updater: TaskUpdater) -> None:
         """Implement your agent logic here.
@@ -21,12 +26,22 @@ class Agent:
         """
         input_text = get_message_text(message)
 
-        # Replace this example code with your agent logic
-
         await updater.update_status(
-            TaskState.working, new_agent_text_message("Thinking...")
+            TaskState.working, new_agent_text_message("Translating code...")
         )
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=[f"You are a professional code translator. Translate the following code and explain the changes briefly:\n\n{input_text}"]
+        )
+        
+        translation = response.text
+
         await updater.add_artifact(
-            parts=[Part(root=TextPart(text=input_text))],
-            name="Echo",
+            parts=[Part(root=TextPart(text=translation))],
+            name="Translation",
+        )
+        
+        await updater.update_status(
+            TaskState.completed, new_agent_text_message("Translation complete.")
         )

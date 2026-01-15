@@ -24,20 +24,20 @@ def main():
     # See: https://a2a-protocol.org/latest/tutorials/python/3-agent-skills-and-card/
     
     skill = AgentSkill(
-        id="",
-        name="",
-        description="",
-        tags=[],
-        examples=[]
+        id="code-translation",
+        name="Code Translation",
+        description="Translates code from one programming language to another.",
+        tags=["translation", "code", "programming"],
+        examples=["Convert this Python code to JavaScript."]
     )
 
     agent_card = AgentCard(
-        name="",
-        description="",
+        name="CodeTranslator",
+        description="An agent that translates code between programming languages.",
         url=args.card_url or f"http://{args.host}:{args.port}/",
         version='1.0.0',
-        default_input_modes=['text'],
-        default_output_modes=['text'],
+        default_input_modes=['text/plain'],
+        default_output_modes=['text/plain'],
         capabilities=AgentCapabilities(streaming=True),
         skills=[skill]
     )
