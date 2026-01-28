@@ -51,28 +51,69 @@ Code to translate:
 {code}
 """
 
-        models_to_try = [
-            "gemini-2.5-flash",
+        # Models that support JSON mode (ordered by preference and quota independence)
+        json_supported_models = [
+            "gemini-2.5-flash-lite",
+            "gemini-2.0-flash-lite",
             "gemini-2.0-flash",
-            "gemma-3-27b-it",
-            "gemma-3-12b-it",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash-001",
+            "gemini-2.0-flash-lite-001",
             "gemini-flash-latest", 
+            "gemini-flash-lite-latest",
             "gemini-pro-latest",
-            "gemini-2.5-pro"
+            "gemini-2.5-pro",
+            "gemini-exp-1206",
+            "gemini-3-flash-preview",
+            "gemini-3-pro-preview"
         ]
+        
+        # Models that don't support JSON mode (use text and parse manually)
+        text_only_models = [
+            "gemma-3-1b-it",
+            "gemma-3-4b-it",
+            "gemma-3-12b-it",
+            "gemma-3-27b-it",
+            "gemma-3n-e2b-it",
+            "gemma-3n-e4b-it"
+        ]
+        
+        models_to_try = json_supported_models + text_only_models
         
         last_error = None
         for model in models_to_try:
             try:
                 print(f"[DEBUG] Trying translation with model: {model}")
-                response = self.client.models.generate_content(
-                    model=model,
-                    contents=[prompt],
-                    config=genai.types.GenerateContentConfig(response_mime_type="application/json")
-                )
                 
-                # Ensure we send back a JSON string as expected by the Green Agent
-                translation_json = response.text
+                # Determine if model supports JSON mode
+                use_json_mode = model in json_supported_models
+                
+                if use_json_mode:
+                    response = self.client.models.generate_content(
+                        model=model,
+                        contents=[prompt],
+                        config=genai.types.GenerateContentConfig(response_mime_type="application/json")
+                    )
+                    translation_json = response.text
+                else:
+                    # For Gemma models - use text mode and extract JSON manually
+                    response = self.client.models.generate_content(
+                        model=model,
+                        contents=[prompt]
+                    )
+                    response_text = response.text
+                    
+                    # Try to extract JSON from the response
+                    import re
+                    # Look for JSON object
+                    json_match = re.search(r'\{[^{}]*"translated_code"[^{}]*\}', response_text, re.DOTALL)
+                    if json_match:
+                        translation_json = json_match.group(0)
+                    else:
+                        # Fallback: wrap the response in JSON format
+                        # Strip markdown code blocks if present
+                        clean_code = re.sub(r'```\w*\n?', '', response_text).strip()
+                        translation_json = json.dumps({"translated_code": clean_code})
                 
                 await updater.add_artifact(
                     parts=[Part(root=TextPart(text=translation_json))],
@@ -97,3 +138,4 @@ Code to translate:
         
         # If all models failed
         await updater.failed(new_agent_text_message(f"Translation failed with all models. Last error: {last_error}"))
+
